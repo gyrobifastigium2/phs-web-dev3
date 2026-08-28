@@ -1,21 +1,23 @@
 import random
 import datetime
+from typing import Any
 
 import requests
-import json
 
-Settings = {
-    'daily': False, # Determines whether the game should choose a seed based off of the current day or not
+
+settings: dict[str,Any] = {
+    'daily': False,   # Determines whether the game should choose a seed based off of the current day or not
     'maxGuesses': 6,
-    'colorblind': False, # If true, prints direct results instead of colored text
-    'wordLength': 6, # Anything other than 5 uses an API, max of 15, min of 2
-    'useDictionaryAPI': True # If false, disables the check to see if you guessed a valid word. Doesn't disable the answer generator.
+    'colorblind': False,   # If true, prints direct results instead of colored text
+    'wordLength': 6,   # Anything other than 5 uses an API, max of 15, min of 2
+    'useDictionaryAPI': True   # If false, disables the check to see if you guessed a valid word. Doesn't disable the answer generator.
 }
 
-def change_setting(setting:str,description:str):
-    if not setting in Settings:
+
+def change_setting(setting: str, description: str):
+    if setting not in settings:
         return
-    allowedType = type(Settings[setting])
+    allowedType = type(settings[setting])  # type: ignore
     print(f"Input desired value for the following setting: {setting}")
     newValue = input(f"Description: {description}\nNew value:")
     
@@ -31,11 +33,12 @@ def change_setting(setting:str,description:str):
     elif allowedType == int:
         try:
             newValue = int(newValue)
-        except:
+        except ValueError:
             print("Please enter a valid integer.")
             change_setting(setting,description)
             return
-    Settings[setting] = newValue
+    settings[setting] = newValue
+
 
 change_setting('daily','Determines whether the game should choose a seed based off of the current day or not. ONLY WORKS WITH 5 LETTER ANSWERS')
 change_setting('maxGuesses','The maximum amount of times you can guess')
@@ -46,13 +49,15 @@ change_setting('useDictionaryAPI','If false, disables valid word check for answe
 RANDOM_WORD_API = 'https://random-word-api.herokuapp.com/word'
 DICTIONARY_API = 'https://api.dictionaryapi.dev/api/v2/entries/en/'
 
-def request_data(url):
+
+def request_data(url: str):
     headers = {
         "User-Agent": "WordleBot/1.0",
         "Accept": "application/json"
     }
-    request = requests.get(url,headers=headers)
+    request = requests.get(url, headers=headers)
     return request.json()
+
 
 class Color:
     GREEN = '\033[32m' 
@@ -60,53 +65,58 @@ class Color:
     WHITE = '\033[37m'
     RESET = '\033[0m'
 
-class Wordle():
-    def __init__(self,*,maxGuesses=6,daily=False,colorblind=False,wordLength=5,useDictionaryAPI=True):
+
+class Wordle:
+    def __init__(
+            self,*,maxGuesses: int = 6, daily: bool = False,
+            colorblind: bool = False, wordLength: int = 5,
+            useDictionaryAPI: bool = True
+        ):
 
         wordLength = min(wordLength,15)
         wordLength = max(2,wordLength)
 
-        self.answer_list = []
+        self.answer_list: list[str] = []
         with open('wordle/answers.txt','r',encoding='utf-8') as f:
             for line in f:
                 self.answer_list.append(line.strip())
-        self.word_list = []
+        self.word_list: list[str] = []
         with open('wordle/words.txt','r',encoding='utf-8') as f:
             for line in f:
                 self.word_list.append(line.strip())
 
-        self.guesses = []
-        self.results = []
+        self.guesses: list[str] = []
+        self.results: list[list[str]] = []
 
-        self.useDictionaryAPI = useDictionaryAPI
+        self.useDictionaryAPI: bool = useDictionaryAPI
 
-        self.maxGuesses = maxGuesses
-        self.colorblind = colorblind
-        self.won = False
+        self.maxGuesses: int = maxGuesses
+        self.colorblind: bool = colorblind
+        self.won: bool = False
 
         if wordLength == 5:
-            self.answer = self.generateAnswer(daily)
+            self.answer = self.generate_answer(daily)
         else:
             print("Calling dictionary API...")
             self.answer = request_data(RANDOM_WORD_API + '?length=' + str(wordLength))[0]
 
             if not self.answer:
                 print("API call failed, defaulting to default word length (5)")
-                self.answer = self.generateAnswer(daily)
+                self.answer = self.generate_answer(daily)
 
 
-        self.startGame()
+        self.start_game()
 
     # Should return something like this if successful:
     # ['Green','Green','Yellow','Grey','Grey']
-    def guess(self) -> list[str] or None:
+    def guess(self) -> list[str] | None:
         print(f"Guesses left: {self.maxGuesses - len(self.guesses)}/{self.maxGuesses}")
         print("----------------------")
         player_guess = input(f"Guess a {len(self.answer)} letter word: ")
 
         try:
             player_guess = player_guess.lower()
-        except:
+        except Exception:
             print("Error while trying to lower player guess")
             self.guess()
             return
@@ -126,13 +136,13 @@ class Wordle():
                 print("\nGuess not in word list.\n")
                 self.guess()
                 return
-        elif self.useDictionaryAPI == True:
+        elif self.useDictionaryAPI:
             try:
                 print("Checking dictionary for guess...")
                 print("Requesting:",DICTIONARY_API+player_guess)
                 data = request_data(DICTIONARY_API+player_guess)
                 
-                if data == None:
+                if data is None:
                     retry = input("DictionaryAPI failed to return data, retry? (y/n):")
 
                     if 'y' in retry:
@@ -144,19 +154,18 @@ class Wordle():
                         self.guess()
                     return
                 data[0] # Errors if the API returns a blank table instead of a definition
-            except:
+            except Exception:
                 print("Could not find word in dictionary API")
                 self.guess()
                 return
         
-        results = ['' for letter in self.answer]
-        found_letters = []
+        results: list[str] = ['' for _ in self.answer]
+        found_letters: list[str] = []
 
         for index,letter in enumerate(player_guess):
             if letter == self.answer[index]:
 
-                # Prevents case where guessing a letter n times can cause letter to show greater than n times
-                # Happens because yellow letter does not check future cases
+                # Removes excess yellows
                 if self.answer.count(letter) <= found_letters.count(letter):
                     for i in range(0,index):
                         if results[i] == 'Yellow' and player_guess[i] == letter:
@@ -173,17 +182,18 @@ class Wordle():
 
         self.guesses.append(player_guess)
         self.results.append(results)
-        self.displayGuess(player_guess,results)
+        self.display_guess(player_guess,results)
 
         if player_guess == self.answer:
             self.won = True
 
         return results
 
-    def displayGuess(self,guess:str,results:str) -> None:
+
+    def display_guess(self,guess: str, results: list[str]) -> None:
         guess_index = self.guesses.index(guess)
         if guess_index > 0:
-            self.displayGuess(self.guesses[guess_index - 1],self.results[guess_index - 1])
+            self.display_guess(self.guesses[guess_index - 1],self.results[guess_index - 1])
 
         if self.colorblind:
             print(results)
@@ -201,7 +211,8 @@ class Wordle():
         
         print(string)
 
-    def generateAnswer(self,daily=False) -> str:
+
+    def generate_answer(self, daily: bool = False) -> str:
         if daily:
             today = datetime.date.today().isoformat()
             random.seed(today)
@@ -210,7 +221,7 @@ class Wordle():
 
 
     # Main game loop, function should end when the game is over
-    def startGame(self) -> None:
+    def start_game(self) -> None:
         while len(self.guesses) < self.maxGuesses and not self.won:
             self.guess()
         if self.won:
@@ -218,4 +229,4 @@ class Wordle():
         else:
             print(f"You lost.\nThe word was: {self.answer}")
 
-game = Wordle(**Settings)
+game = Wordle(**settings)
