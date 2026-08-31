@@ -77,11 +77,11 @@ class Wordle:
         wordLength = max(2,wordLength)
 
         self.answer_list: list[str] = []
-        with open('wordle/answers.txt','r',encoding='utf-8') as f:
+        with open('unit-1-welcome/answers.txt','r',encoding='utf-8') as f:
             for line in f:
                 self.answer_list.append(line.strip())
         self.word_list: list[str] = []
-        with open('wordle/words.txt','r',encoding='utf-8') as f:
+        with open('unit-1-welcome/words.txt','r',encoding='utf-8') as f:
             for line in f:
                 self.word_list.append(line.strip())
 
