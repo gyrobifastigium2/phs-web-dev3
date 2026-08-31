@@ -4,17 +4,29 @@ from typing import Any
 
 import requests
 
-
+# daily: Determines whether the game should choose a seed based off of the current day or not
+# colorblind: If true, prints direct results instead of colored text
+# wordLength: Anything other than 5 uses an API, max of 15, min of 2
+# useDictionaryAPI: If false, disables the check to see if you guessed a valid word. Doesn't disable the answer generator.
 settings: dict[str,Any] = {
-    'daily': False,   # Determines whether the game should choose a seed based off of the current day or not
+    'daily': False,
     'maxGuesses': 6,
-    'colorblind': False,   # If true, prints direct results instead of colored text
-    'wordLength': 6,   # Anything other than 5 uses an API, max of 15, min of 2
-    'useDictionaryAPI': True   # If false, disables the check to see if you guessed a valid word. Doesn't disable the answer generator.
+    'colorblind': False,
+    'wordLength': 6,
+    'useDictionaryAPI': True
 }
 
 
 def change_setting(setting: str, description: str):
+    """
+    Prompts the user to input a new value for setting with description.
+
+    Args:
+        setting: the setting to change, must be in Settings dictionary.
+        description: the description to display to the user
+    Returns:
+        None
+    """
     if setting not in settings:
         return
     allowedType = type(settings[setting])  # type: ignore
@@ -51,6 +63,7 @@ DICTIONARY_API = 'https://api.dictionaryapi.dev/api/v2/entries/en/'
 
 
 def request_data(url: str):
+    """Requests data from a website with given url parameter"""
     headers = {
         "User-Agent": "WordleBot/1.0",
         "Accept": "application/json"
@@ -58,7 +71,7 @@ def request_data(url: str):
     request = requests.get(url, headers=headers)
     return request.json()
 
-
+# Allows colored text to be printed in the console
 class Color:
     GREEN = '\033[32m' 
     YELLOW = '\033[33m' 
@@ -72,6 +85,18 @@ class Wordle:
             colorblind: bool = False, wordLength: int = 5,
             useDictionaryAPI: bool = True
         ):
+        """
+        Initializes a new wordle game.
+
+        Args:
+            maxGuesses: The amount of time a player can guess
+            daily: Whether or not to use rng based off current day
+            colorblind: Whether or not to display results colored
+            wordLength: The length of the answer
+            useDictionaryAPI: Whether or not to use the diciontary API to check if words are valid
+        Returns:
+            None
+        """
 
         wordLength = min(wordLength,15)
         wordLength = max(2,wordLength)
@@ -110,6 +135,13 @@ class Wordle:
     # Should return something like this if successful:
     # ['Green','Green','Yellow','Grey','Grey']
     def guess(self) -> list[str] | None:
+        """Prompts the player to guess a new word
+
+        Args:
+            None
+        Returns:
+            results: The colors that correspond with the player's guess
+        """
         print(f"Guesses left: {self.maxGuesses - len(self.guesses)}/{self.maxGuesses}")
         print("----------------------")
         player_guess = input(f"Guess a {len(self.answer)} letter word: ")
@@ -165,7 +197,8 @@ class Wordle:
         for index,letter in enumerate(player_guess):
             if letter == self.answer[index]:
 
-                # Removes excess yellows
+                # Prevents case where guessing a letter n times can cause letter to show greater than n times
+                # Happens because yellow letter does not check future cases
                 if self.answer.count(letter) <= found_letters.count(letter):
                     for i in range(0,index):
                         if results[i] == 'Yellow' and player_guess[i] == letter:
@@ -191,6 +224,13 @@ class Wordle:
 
 
     def display_guess(self,guess: str, results: list[str]) -> None:
+        """
+        Prints out the player's guess with colors
+
+        Args:
+            guess: The player's guess
+            results: The colors to display
+        """
         guess_index = self.guesses.index(guess)
         if guess_index > 0:
             self.display_guess(self.guesses[guess_index - 1],self.results[guess_index - 1])
@@ -213,6 +253,7 @@ class Wordle:
 
 
     def generate_answer(self, daily: bool = False) -> str:
+        """Generates an answer for the wordle"""
         if daily:
             today = datetime.date.today().isoformat()
             random.seed(today)
@@ -222,6 +263,7 @@ class Wordle:
 
     # Main game loop, function should end when the game is over
     def start_game(self) -> None:
+        """The main game loop"""
         while len(self.guesses) < self.maxGuesses and not self.won:
             self.guess()
         if self.won:
